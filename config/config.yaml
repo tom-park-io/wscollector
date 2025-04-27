@@ -1,0 +1,27 @@
+app:
+  name: "wscollector"
+  version: "0.0.1"
+
+log:
+  level: "debug"
+  format: "json"
+  output_file: "./logs/app.log"
+  environment: "prod"
+
+bybit:
+  rest:
+    base_url: "https://api.bybit.com"
+    timeout: 10s
+  ws:
+    url: "wss://stream.bybit.com/v5/public/linear"
+    timeout: 10s
+    interval: "1"
+
+postgres:
+  host: "localhost"
+  port: 5432
+  user: "postgres"
+  password: "yourpw"
+  dbname: "wscollector"
+  sslmode: "disable"
+  timezone: "UTC"
