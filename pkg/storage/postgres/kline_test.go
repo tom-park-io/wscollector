@@ -21,7 +21,7 @@ func TestKlineCRUD(t *testing.T) {
 		TimeZone: "UTC",
 	}
 
-	client, err := postgres.NewClient(cfg.DSN())
+	client, err := postgres.NewClient(cfg.DSN("dev"))
 	if err != nil {
 		t.Fatalf("failed to connect to DB: %v", err)
 	}

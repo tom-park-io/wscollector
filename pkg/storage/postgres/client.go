@@ -25,14 +25,14 @@ func NewClient(dsn string) (*PostgresClient, error) {
 }
 
 // InitializeAndMigrateKlineRecord connects to Postgres, optionally creates the DB, and runs AutoMigrate.
-func InitializeAndMigrateKlineRecord(cfg config.PostgresConfig, createDB bool) (*PostgresClient, error) {
+func InitializeAndMigrateKlineRecord(env string, cfg config.PostgresConfig, createDB bool) (*PostgresClient, error) {
 	if createDB {
 		if err := CreateDatabase(cfg); err != nil {
 			return nil, fmt.Errorf("failed to create database: %w", err)
 		}
 	}
 
-	client, err := NewClient(cfg.DSN())
+	client, err := NewClient(cfg.DSN(env))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect: %w", err)
 	}

@@ -12,10 +12,7 @@ import (
 // CreateDatabase connects to the postgres server and creates a new database if it doesn't exist.
 func CreateDatabase(cfg config.PostgresConfig) error {
 	// Connect to the default 'postgres' DB
-	dsn := fmt.Sprintf(
-		"host=%s port=%d user=%s password=%s dbname=postgres sslmode=%s",
-		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.SSLMode,
-	)
+	dsn := cfg.DSN("dev")
 
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {

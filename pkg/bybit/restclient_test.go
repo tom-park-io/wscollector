@@ -57,6 +57,35 @@ func TestGetKlines(t *testing.T) {
 	t.Logf("Received response: %v", resp)
 }
 
+// go test -v --run TestGetKlines_Interval15m
+func TestGetKlines_Interval15m(t *testing.T) {
+	client := NewRESTClient("https://api.bybit.com", 10*time.Second)
+
+	// Context with timeout for safety
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	end := time.Now()
+	start := end.Add(-4 * time.Hour)
+
+	// Call the GetKlines method with known-good parameters.
+	resp, err := client.GetKlines(ctx,
+		"linear",  // market category (e.g., "linear", "spot", "inverse")
+		"BTCUSDT", // symbol
+		"15",      // interval in minutes as string
+		start,
+		end,
+	)
+	if err != nil {
+		t.Fatalf("GetKlines returned error: %v", err)
+	}
+
+	if len(resp) == 0 {
+		t.Error("Expected non-empty response body")
+	}
+	t.Logf("Received response: %v", resp)
+}
+
 func min(a, b int) int {
 	if a < b {
 		return a

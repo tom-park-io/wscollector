@@ -34,7 +34,7 @@ func TestPostgresClientWithConfig(t *testing.T) {
 		ConnMaxLifetime: 1 * time.Hour,
 	}
 
-	dsn := cfg.DSN()
+	dsn := cfg.DSN("dev")
 
 	client, err := postgres.NewClient(dsn)
 	if err != nil {

@@ -21,7 +21,7 @@ import (
 func StartCollector(cfg *config.Config, logger *zap.Logger) error {
 
 	// Initialize PostgreSQL Client
-	postgresClient, err := postgres.InitializeAndMigrateKlineRecord(cfg.Postgres, true)
+	postgresClient, err := postgres.InitializeAndMigrateKlineRecord(cfg.App.Env, cfg.Postgres, true)
 	if err != nil {
 		return fmt.Errorf("failed to connect to DB: %w", err)
 	}

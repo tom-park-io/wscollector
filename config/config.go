@@ -11,9 +11,16 @@ import (
 )
 
 type Config struct {
+	App      AppConfig      `mapstructure:"app"`
 	Bybit    BybitConfig    `mapstructure:"bybit"`
 	Log      LogConfig      `mapstructure:"log"`
 	Postgres PostgresConfig `mapstructure:"postgres"`
+}
+
+type AppConfig struct {
+	Env     string `mapstructure:"env"`
+	Name    string `mapstructure:"name"`
+	Version string `mapstructure:"version"`
 }
 
 type BybitConfig struct {
