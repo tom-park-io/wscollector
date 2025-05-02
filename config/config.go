@@ -48,7 +48,7 @@ type LogConfig struct {
 
 // Load loads application configuration using Viper.
 // It reads from config.yaml and overrides with environment variables.
-func Load() *Config {
+func Load() Config {
 	v := viper.New()
 
 	v.SetConfigName("config") // config.yaml
@@ -76,5 +76,5 @@ func Load() *Config {
 		log.Fatalf("failed to unmarshal config: %v", err)
 	}
 
-	return &cfg
+	return cfg
 }

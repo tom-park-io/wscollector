@@ -77,12 +77,18 @@ func (c *RESTClient) GetUSDTAltcoinSymbols(ctx context.Context) ([]string, error
 
 func (c *RESTClient) GetKlines(ctx context.Context, category, symbol, interval string,
 	start, end time.Time) ([]memorystore.Kline, error) {
+	// Parse the interval string into a KlineIntervalMeta type
+	klineMeta, err := ParseKlineInterval(interval)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse interval: %w", err)
+	}
+
 	endpoint := fmt.Sprintf(
-		"%s/v5/market/kline?category=%s&symbol=%s&interval=%s&start=%d&end=%d",
+		"%s/v5/market/kline?category=%s&symbol=%s&interval=%s&start=%d&end=%d&limit=1000",
 		c.baseURL,
 		category,
 		symbol,
-		interval,
+		klineMeta.APIValue,
 		start.UnixMilli(),
 		end.UnixMilli(),
 	)
@@ -117,8 +123,7 @@ func (c *RESTClient) GetKlines(ctx context.Context, category, symbol, interval s
 		return nil, fmt.Errorf("decode result: %w", err)
 	}
 
-	// TODO: define interval
-	klines, err := ParseKlineList(fmt.Sprintf("%s", interval), result.List)
+	klines, err := ParseKlineList(klineMeta, result.List)
 	if err != nil {
 		return nil, fmt.Errorf("parse result: %w", err)
 	}

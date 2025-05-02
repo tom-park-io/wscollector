@@ -93,9 +93,8 @@ func ToKlineRecord(symbol string, k memorystore.Kline) (*KlineRecord, error) {
 	}
 
 	return &KlineRecord{
-		Symbol: symbol,
-		// TODO: define interval symbols
-		Interval:  fmt.Sprintf("%sm", k.Interval),
+		Symbol:    symbol,
+		Interval:  k.Interval,
 		Start:     time.UnixMilli(k.Start),
 		End:       time.UnixMilli(k.End),
 		Open:      open,

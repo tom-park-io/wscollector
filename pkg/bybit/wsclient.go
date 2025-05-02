@@ -1,9 +1,9 @@
 package bybit
 
 import (
+	"fmt"
 	"time"
 
-	"wscollector/config"
 	"wscollector/internal/bybit/memorystore"
 
 	"github.com/gorilla/websocket"
@@ -12,18 +12,20 @@ import (
 
 // WSClient handles WebSocket connection to Bybit and message routing.
 type WSClient struct {
-	url     string
-	args    []string
-	conn    *websocket.Conn
-	handler func([]byte)
-	logger  *zap.Logger
+	url         string
+	args        []string
+	conn        *websocket.Conn
+	handler     func([]byte)
+	symbolStore *memorystore.MemorySymbolStore
+	logger      *zap.Logger
 }
 
 // NewClient creates a new WebSocket client with the given URL and logger.
-func NewWSClient(url string, logger *zap.Logger) *WSClient {
+func NewWSClient(url string, store *memorystore.MemorySymbolStore, logger *zap.Logger) *WSClient {
 	return &WSClient{
-		url:    url,
-		logger: logger,
+		url:         url,
+		symbolStore: store,
+		logger:      logger,
 	}
 }
 
@@ -34,8 +36,7 @@ func (c *WSClient) SetMessageHandler(h func([]byte)) {
 
 // Connect establishes the WebSocket connection and subscribes to kline channels
 // for all symbols in the provided symbolStore. It does not start the listener.
-func (c *WSClient) Connect(cfg *config.Config, symbolStore *memorystore.MemorySymbolStore,
-	args []string) error {
+func (c *WSClient) Connect() error {
 
 	// Attempt to connect to the WebSocket server
 	conn, _, err := websocket.DefaultDialer.Dial(c.url, nil)
@@ -47,12 +48,12 @@ func (c *WSClient) Connect(cfg *config.Config, symbolStore *memorystore.MemorySy
 	c.logger.Info("WebSocket connected", zap.String("url", c.url))
 
 	// Store subscription arguments for future reconnects
-	c.args = args
+	c.args = c.symbolStore.GetKlineTopics(c.symbolStore.WsInterval)
 
 	// Send subscription message
 	subMsg := map[string]interface{}{
 		"op":   "subscribe",
-		"args": args,
+		"args": c.args,
 	}
 
 	if err := conn.WriteJSON(subMsg); err != nil {
@@ -101,15 +102,22 @@ func (c *WSClient) reconnectAndResubscribe() error {
 		_ = c.conn.Close()
 	}
 
+	// Replace the current connection
 	c.conn = newConn
 
-	// Resend the subscription message
+	// Regenerate subscription topics based on current symbols
+	c.args = c.symbolStore.GetKlineTopics(c.symbolStore.WsInterval)
+
+	// Build subscription message payload
 	subMsg := map[string]interface{}{
 		"op":   "subscribe",
 		"args": c.args, // c.args must be stored beforehand
 	}
+
+	// Send the subscription message
 	if err := c.conn.WriteJSON(subMsg); err != nil {
-		return err
+		return fmt.Errorf("websocket subscribe failed: %w", err)
 	}
+
 	return nil
 }

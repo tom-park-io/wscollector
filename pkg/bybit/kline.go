@@ -9,7 +9,7 @@ import (
 
 // ParseKlineList converts Bybit REST API kline data to []Kline.
 // It safely skips invalid rows and sets default values for fields not included in REST (e.g., Confirm).
-func ParseKlineList(interval string, raw [][]string) ([]memorystore.Kline, error) {
+func ParseKlineList(meta KlineIntervalMeta, raw [][]string) ([]memorystore.Kline, error) {
 	var out []memorystore.Kline
 
 	for _, row := range raw {
@@ -48,8 +48,8 @@ func ParseKlineList(interval string, raw [][]string) ([]memorystore.Kline, error
 
 		out = append(out, memorystore.Kline{
 			Start:     start,
-			End:       time.UnixMilli(start).Add(time.Minute).UnixMilli(), // fixed to 1m
-			Interval:  interval,
+			End:       time.UnixMilli(start).Add(time.Duration(meta.Minutes)*time.Minute - time.Millisecond).UnixMilli(),
+			Interval:  meta.DBValue,
 			Open:      strconv.FormatFloat(open, 'f', -1, 64),
 			High:      strconv.FormatFloat(high, 'f', -1, 64),
 			Low:       strconv.FormatFloat(low, 'f', -1, 64),

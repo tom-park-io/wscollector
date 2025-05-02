@@ -9,6 +9,7 @@ import (
 	"wscollector/internal/bybit/memorystore"
 	"wscollector/internal/bybit/snapshot"
 	"wscollector/internal/bybit/stream"
+	"wscollector/internal/bybit/symbolmeta"
 	"wscollector/pkg/bybit"
 	"wscollector/pkg/storage/postgres"
 
@@ -18,7 +19,7 @@ import (
 // StartCollector initializes the data pipeline for Bybit linear market data.
 // It loads symbol metadata via REST, sets up a WebSocket stream for klines,
 // and stores them in-memory (and optionally to DB).
-func StartCollector(cfg *config.Config, logger *zap.Logger) error {
+func StartCollector(cfg config.Config, logger *zap.Logger) error {
 
 	// Initialize PostgreSQL Client
 	postgresClient, err := postgres.InitializeAndMigrateKlineRecord(cfg.App.Env, cfg.Postgres, true)
@@ -29,35 +30,37 @@ func StartCollector(cfg *config.Config, logger *zap.Logger) error {
 	// Create REST client and channel for symbol metadata
 	restClient := bybit.NewRESTClient(cfg.Bybit.REST.BaseURL, cfg.Bybit.REST.Timeout)
 
-	// Load symbol metadata asynchronously
-	symbolCh := make(chan string, 100)
-	go func() {
-		if err := snapshot.LoadSymbols(symbolCh, cfg, restClient, logger); err != nil {
-			logger.Fatal("failed to load symbols", zap.Error(err))
-		}
-	}()
+	// Initialize the symbol loader with required dependencies
+	loader := &snapshot.SymbolLoader{
+		Cfg:        cfg,
+		RestClient: restClient,
+		Logger:     logger,
+	}
 
-	// Initialize in-memory symbol store and attach worker
-	symbolStore := memorystore.NewSymbolStore()
-	symbolStore.StartWorker(symbolCh)
+	// Construct the midnight loader with a strategy that fetches symbols asynchronously
+	midnight := &symbolmeta.MidnightLoader{
+		Load: symbolmeta.DefaultLoadFn(loader),
+	}
 
-	// // Wait for expected number of symbols (TODO: make this dynamic)
-	// const expectedSymbolCount = 508
-	// for {
-	// 	if len(symbolStore.GetAll()) >= expectedSymbolCount {
-	// 		break
-	// 	}
-	// 	time.Sleep(1 * time.Second)
-	// }
+	// Parse the interval string into a KlineIntervalMeta type
+	klineMeta, err := bybit.ParseKlineInterval(cfg.Bybit.WS.Interval)
+	if err != nil {
+		return fmt.Errorf("failed to parse interval: %w", err)
+	}
+
+	// Initialize in-memory symbol store and start worker to consume incoming symbols
+	symbolStore := memorystore.NewSymbolStore(klineMeta.APIValue, logger)
+	midnight.Start(symbolStore.StartSymbolSyncWorker)
+
+	logger.Info("waiting 5 seconds before starting symbol sync", zap.String("reason", "initialization delay"))
 	time.Sleep(5 * time.Second)
 
 	// TODO: Concurrent tasks
-	sem := make(chan struct{}, 5) // max 5 concurrent tasks
+	sem := make(chan struct{}, 10) // max 10 concurrent tasks
 	// Prepare kline subscription topics
 	end := time.Now()
 	start := end.Add(-4 * time.Hour)
 
-	var args []string
 	symbols := symbolStore.GetAll()
 	for _, symbol := range symbols {
 		symbol := symbol // capture
@@ -108,13 +111,10 @@ func StartCollector(cfg *config.Config, logger *zap.Logger) error {
 				logger.Info("completed successfully for symbol", zap.String("symbol", symbol))
 			}
 		}()
-
-		// "args": []string{"kline.1.BTCUSDT"},
-		args = append(args, fmt.Sprintf("kline.%s.%s", cfg.Bybit.WS.Interval, symbol))
 	}
 
 	// Initialize WebSocket client
-	wsClient := bybit.NewWSClient(cfg.Bybit.WS.URL, logger)
+	wsClient := bybit.NewWSClient(cfg.Bybit.WS.URL, symbolStore, logger)
 	klineStore := memorystore.NewKlineStore()
 
 	// Register WebSocket message handler
@@ -131,7 +131,7 @@ func StartCollector(cfg *config.Config, logger *zap.Logger) error {
 	}()
 
 	// Connect to WebSocket with the list of symbols
-	if err := wsClient.Connect(cfg, symbolStore, args); err != nil {
+	if err := wsClient.Connect(); err != nil {
 		return err
 	}
 	go wsClient.Listen() // explicitly start listener
